@@ -93,3 +93,4 @@ ENV/
 hw2/data
 hw2/figures
 *~
+*.pkl
