@@ -164,8 +164,13 @@ class QLearner(object):
     q_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="q_func")
     target_q_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="target_q_func")
     
+    if double_q:
+        self.opt_action = tf.argmax(self.q_t, axis=1, output_type=tf.int32) 
+    else:
+    	self.opt_action = tf.argmax(self.q_tp1, axis=1, output_type=tf.int32)
     q = tf.reduce_sum(self.q_t * tf.one_hot(self.act_t_ph, self.num_actions, dtype=tf.float32), 1)
-    y = self.rew_t_ph + gamma * (1 - self.done_mask_ph) * tf.reduce_max(self.q_tp1, 1)
+    y = self.rew_t_ph + gamma * (1 - self.done_mask_ph) * tf.reduce_sum(
+        	self.q_tp1 * tf.one_hot(self.opt_action, self.num_actions, dtype=tf.float32), 1)
     self.total_error = tf.reduce_mean(huber_loss(q - y))
 
     ######
@@ -242,7 +247,7 @@ class QLearner(object):
     if random.random() < epsilon or not self.model_initialized:
     	action = self.env.action_space.sample()
     else:
-        action = self.session.run(tf.argmax(self.q_t, axis=1, output_type=tf.int32), feed_dict={
+        action = self.session.run(self.opt_action, feed_dict={
         	self.obs_t_ph : [self.replay_buffer.encode_recent_observation()]})[0]
     obs, reward, done, _ = self.env.step(action)
     self.replay_buffer.store_effect(self.replay_buffer_idx, action, reward, done)
