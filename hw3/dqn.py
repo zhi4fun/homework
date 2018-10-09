@@ -243,8 +243,8 @@ class QLearner(object):
     	action = self.env.action_space.sample()
     else:
         action = self.session.run(tf.argmax(self.q_t, axis=1, output_type=tf.int32), feed_dict={
-        	self.obs_t_ph : np.array([self.replay_buffer.encode_recent_observation()])})
-    obs, reward, done, info = self.env.step(action)
+        	self.obs_t_ph : [self.replay_buffer.encode_recent_observation()]})[0]
+    obs, reward, done, _ = self.env.step(action)
     self.replay_buffer.store_effect(self.replay_buffer_idx, action, reward, done)
     if done:
     	self.last_obs = self.env.reset()
@@ -326,6 +326,7 @@ class QLearner(object):
       self.best_mean_episode_reward = max(self.best_mean_episode_reward, self.mean_episode_reward)
 
     if self.t % self.log_every_n_steps == 0 and self.model_initialized:
+      print("==============================")
       print("Timestep %d" % (self.t,))
       print("mean reward (100 episodes) %f" % self.mean_episode_reward)
       print("best mean reward %f" % self.best_mean_episode_reward)
