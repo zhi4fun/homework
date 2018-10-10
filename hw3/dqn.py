@@ -164,14 +164,17 @@ class QLearner(object):
     q_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="q_func")
     target_q_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="target_q_func")
     
-    if double_q:
-        self.opt_action = tf.argmax(self.q_t, axis=1, output_type=tf.int32) 
-    else:
-    	self.opt_action = tf.argmax(self.q_tp1, axis=1, output_type=tf.int32)
+    self.act_tp1_ph = tf.placeholder(tf.int32, [None])
     q = tf.reduce_sum(self.q_t * tf.one_hot(self.act_t_ph, self.num_actions, dtype=tf.float32), 1)
     y = self.rew_t_ph + gamma * (1 - self.done_mask_ph) * tf.reduce_sum(
-        	self.q_tp1 * tf.one_hot(self.opt_action, self.num_actions, dtype=tf.float32), 1)
-    self.total_error = tf.reduce_mean(huber_loss(q - y))
+        	self.q_tp1 * tf.one_hot(self.act_tp1_ph, self.num_actions, dtype=tf.float32), 1)
+    self.total_error = tf.reduce_mean(huber_loss(q - tf.stop_gradient(y)))
+    self.act_t = tf.argmax(self.q_t, 1)
+    self.double_q = double_q
+    if self.double_q:
+    	self.act_tp1 = tf.argmax(self.q_t, 1)
+    else:
+    	self.act_tp1 = tf.argmax(self.q_tp1, 1)
 
     ######
 
@@ -242,15 +245,15 @@ class QLearner(object):
     #####
 
     # YOUR CODE HERE
-    self.replay_buffer_idx = self.replay_buffer.store_frame(self.last_obs)
+    replay_buffer_idx = self.replay_buffer.store_frame(self.last_obs)
     epsilon = self.exploration.value(self.t)
     if random.random() < epsilon or not self.model_initialized:
     	action = self.env.action_space.sample()
     else:
-        action = self.session.run(self.opt_action, feed_dict={
+        action = self.session.run(self.act_t, feed_dict={
         	self.obs_t_ph : [self.replay_buffer.encode_recent_observation()]})[0]
     obs, reward, done, _ = self.env.step(action)
-    self.replay_buffer.store_effect(self.replay_buffer_idx, action, reward, done)
+    self.replay_buffer.store_effect(replay_buffer_idx, action, reward, done)
     if done:
     	self.last_obs = self.env.reset()
     else:
@@ -306,13 +309,23 @@ class QLearner(object):
       		self.obs_t_ph: obs_t_batch,
       		self.obs_tp1_ph: obs_tp1_batch})
       	self.model_initialized = True
+
+      if self.double_q:
+      	act_tp1_batch = self.session.run(self.act_tp1, feed_dict={
+      		self.obs_t_ph : obs_tp1_batch
+      		})
+      else:
+      	act_tp1_batch = self.session.run(self.act_tp1, feed_dict={
+      		self.obs_tp1_ph : obs_tp1_batch
+      		})
       self.session.run(self.train_fn, feed_dict={
       	self.obs_t_ph : obs_t_batch,
       	self.act_t_ph : act_t_batch,
       	self.rew_t_ph : rew_t_batch,
       	self.obs_tp1_ph : obs_tp1_batch,
       	self.done_mask_ph : done_mask_batch,
-      	self.learning_rate : self.optimizer_spec.lr_schedule.value(self.t)
+      	self.learning_rate : self.optimizer_spec.lr_schedule.value(self.t),
+      	self.act_tp1_ph : act_tp1_batch
       	})
 
       self.num_param_updates += 1
