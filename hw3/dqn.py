@@ -100,6 +100,7 @@ class QLearner(object):
     self.session = session
     self.exploration = exploration
     self.rew_file = str(uuid.uuid4()) + '.pkl' if rew_file is None else rew_file
+    self.log = []
 
     ###############
     # BUILD MODEL #
@@ -358,8 +359,10 @@ class QLearner(object):
 
       sys.stdout.flush()
 
+      self.log.append([self.t, self.mean_episode_reward, self.best_mean_episode_reward])
       with open(self.rew_file, 'wb') as f:
-        pickle.dump(episode_rewards, f, pickle.HIGHEST_PROTOCOL)
+        # pickle.dump(episode_rewards, f, pickle.HIGHEST_PROTOCOL)
+        pickle.dump(self.log, f, pickle.HIGHEST_PROTOCOL)
 
 def learn(*args, **kwargs):
   alg = QLearner(*args, **kwargs)
