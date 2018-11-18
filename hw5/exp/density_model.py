@@ -238,7 +238,7 @@ class Exemplar(Density_Model):
             Hint: use build_mlp
         """
         z_mean = build_mlp(state, z_size, scope, n_layers=n_layers, size=hid_size)
-        z_logstd = tf.log(tf.get_variable("z_logstd", shape=[z_size], dtype=tf.float32, initializer=tf.constant_initializer(0.)))
+        z_logstd = tf.get_variable("z_logstd", shape=[z_size], dtype=tf.float32, initializer=tf.constant_initializer(0.))
         return tfp.distributions.MultivariateNormalDiag(loc=z_mean, scale_diag=tf.exp(z_logstd))
 
     def make_prior(self, z_size):
@@ -316,7 +316,7 @@ class Exemplar(Density_Model):
         # Sampled Latent
         z1 = encoder1.sample()
         z2 = encoder2.sample()
-        z = tf.concat([z1, z2], 0)
+        z = tf.concat([z1, z2], 1)
 
         # Discriminator
         discriminator = make_discriminator(z, 1, 'discriminator', n_layers=2, hid_size=self.hid_dim)
@@ -348,8 +348,8 @@ class Exemplar(Density_Model):
         	self.discrim_target : target
         	})
         ll = self.sess.run(self.log_likelihood, feed_dict={
-        	self.state1 : state1,
-        	self.state2 : state2,
+            self.state1 : state1,
+            self.state2 : state2,
         	self.discrim_target : target
         	})
         kl = self.sess.run(self.kl, feed_dict={
@@ -383,7 +383,7 @@ class Exemplar(Density_Model):
         assert state1.shape[0] == state2.shape[0]
         #raise NotImplementedError
         batch_size = state1.shape[0]
-        target = np.ones(batch_size)
+        target = np.ones(batch_size)[:, None]
         likelihood = self.sess.run(self.likelihood, feed_dict={
         	self.state1 : state1,
         	self.state2 : state2,
